@@ -3,6 +3,11 @@ import os
 import time
 import subprocess
 import json
+import smtplib
+import ssl
+import mimetypes
+from email.message import EmailMessage
+from urllib.parse import urlparse, parse_qs
 from flask import Flask, render_template, request, send_from_directory, jsonify
 from flask_cors import CORS
 import lane_detection
@@ -94,6 +99,116 @@ def _extract_gps_with_exiftool(file_path):
 
 app = Flask(__name__, static_folder="static")
 CORS(app)
+
+# Load .env if present (code-only config without shell env)
+def _load_env_file(env_path: str = '.env'):
+    try:
+        path = os.path.join(os.path.dirname(__file__), env_path)
+        if not os.path.exists(path):
+            return
+        with open(path, 'r') as f:
+            for line in f:
+                s = line.strip()
+                if not s or s.startswith('#'):
+                    continue
+                if '=' not in s:
+                    continue
+                k, v = s.split('=', 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k and (k not in os.environ):
+                    os.environ[k] = v
+    except Exception:
+        pass
+
+_load_env_file('.env')
+
+# Email (SMTP) configuration via environment variables for security
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASS = os.getenv("SMTP_PASS")
+SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER or "")
+
+# Optional: override from config_local.json (not committed; place next to app.py)
+def _load_local_smtp_overrides():
+    try:
+        cfg_path = os.path.join(os.path.dirname(__file__), 'config_local.json')
+        if os.path.exists(cfg_path):
+            with open(cfg_path, 'r') as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return {
+                    'SMTP_HOST': data.get('SMTP_HOST'),
+                    'SMTP_PORT': data.get('SMTP_PORT'),
+                    'SMTP_USER': data.get('SMTP_USER'),
+                    'SMTP_PASS': data.get('SMTP_PASS'),
+                    'SMTP_FROM': data.get('SMTP_FROM'),
+                }
+    except Exception:
+        pass
+    return {}
+
+_over = _load_local_smtp_overrides()
+if _over:
+    SMTP_HOST = _over.get('SMTP_HOST') or SMTP_HOST
+    try:
+        if _over.get('SMTP_PORT') is not None:
+            SMTP_PORT = int(_over.get('SMTP_PORT'))
+    except Exception:
+        pass
+    SMTP_USER = _over.get('SMTP_USER') or SMTP_USER
+    SMTP_PASS = _over.get('SMTP_PASS') or SMTP_PASS
+    SMTP_FROM = _over.get('SMTP_FROM') or SMTP_FROM
+
+
+def _safe_output_path_from_url(url: str):
+    try:
+        # strip query string and get basename
+        path = urlparse(url).path
+        name = os.path.basename(path)
+        # ensure served only from OUTPUT_FOLDER
+        abs_path = os.path.join(OUTPUT_FOLDER, name)
+        abs_root = os.path.abspath(OUTPUT_FOLDER)
+        if os.path.commonpath([os.path.abspath(abs_path), abs_root]) != abs_root:
+            return None
+        if not os.path.isfile(abs_path):
+            return None
+        return abs_path
+    except Exception:
+        return None
+
+
+def _send_email_with_attachments(to_email: str, subject: str, body: str, attachment_paths):
+    if not SMTP_USER or not SMTP_PASS:
+        raise RuntimeError("SMTP credentials not configured. Set SMTP_USER and SMTP_PASS env vars.")
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = SMTP_FROM or SMTP_USER
+    msg["To"] = to_email
+    msg.set_content(body)
+
+    # Attach files
+    for p in attachment_paths or []:
+        try:
+            ctype, encoding = mimetypes.guess_type(p)
+            if ctype is None:
+                ctype = "application/octet-stream"
+            maintype, subtype = ctype.split("/", 1)
+            with open(p, "rb") as f:
+                msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(p))
+        except Exception:
+            continue
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server.ehlo()
+        if SMTP_PORT == 587:
+            server.starttls(context=context)
+            server.ehlo()
+        server.login(SMTP_USER, SMTP_PASS)
+        server.send_message(msg)
 
 
 @app.route('/')
@@ -217,6 +332,60 @@ def upload_file():
     response["_debug_received"] = debug_received
 
     return jsonify(response)
+
+
+@app.route('/send_email', methods=['POST'])
+def send_email_route():
+    try:
+        data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    to_email = (data or {}).get("to")
+    image_urls = (data or {}).get("images") or []
+    location = (data or {}).get("location") or None
+
+    if not to_email:
+        return jsonify({"error": "Missing 'to' email address"}), 400
+
+    # Map URLs to output file paths safely
+    attachments = []
+    for url in image_urls:
+        p = _safe_output_path_from_url(url)
+        if p:
+            attachments.append(p)
+    # Trim to max 5 attachments
+    attachments = attachments[:5]
+
+    # Build body with location
+    body_lines = [
+        "Pothole detection report",
+    ]
+    if isinstance(location, dict) and location.get("latitude") is not None and location.get("longitude") is not None:
+        lat = float(location.get("latitude"))
+        lon = float(location.get("longitude"))
+        body_lines.append(f"Location: {lat:.6f}, {lon:.6f}")
+        body_lines.append(f"OpenStreetMap: https://www.openstreetmap.org/?mlat={lat:.6f}&mlon={lon:.6f}#map=16/{lat:.6f}/{lon:.6f}")
+        body_lines.append(f"Google Maps: https://maps.google.com/?q={lat:.6f},{lon:.6f}")
+    else:
+        body_lines.append("Location: unavailable")
+
+    body_lines.append("")
+    if attachments:
+        body_lines.append(f"Attached pothole snapshots: {len(attachments)}")
+    else:
+        body_lines.append("No snapshots available to attach.")
+
+    try:
+        _send_email_with_attachments(
+            to_email=to_email,
+            subject="Pothole Detection Results",
+            body="\n".join(body_lines),
+            attachment_paths=attachments,
+        )
+        return jsonify({"status": "sent", "to": to_email, "attached": [os.path.basename(a) for a in attachments]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/output/<path:filename>')

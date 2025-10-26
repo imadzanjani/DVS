@@ -1,0 +1,13 @@
+cd path/to/extracted/folder
+python -m venv venv
+source venv/bin/activate  # On Windows, use venv\Scripts\activate      x
+venv\Scripts\Activate             y
+pip install -r requirements.txt
+pip install opencv-python numpy
+python main.py
+
+
+python -m pip install --upgrade pip
+pip install opencv-python numpy matplotlib
+pip install flask opencv-python numpy matplotlib
+pip install flask-cors

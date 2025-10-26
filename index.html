@@ -1,0 +1,465 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Digital Vision — Upload Video</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --accent:#2563eb;
+      --accent-2:#ff4c4c;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg, #071023 0%, #0f1724 100%);
+      color: #0b1220;
+      display:flex;
+      justify-content:center;
+      padding:40px 20px;
+    }
+    header { position: fixed; top:18px; left:50%; transform:translateX(-50%); width: min(1200px, calc(100% - 40px)); display:flex; align-items:center; justify-content:space-between; padding:12px 18px; background: rgba(255,255,255,0.03); border-radius:12px; z-index:40; }
+    .brand { display:flex; gap:12px; align-items:center; color:#fff; }
+    .logo { width:44px; height:44px; border-radius:10px; background: linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex; align-items:center; justify-content:center; color:white; font-weight:700; }
+    nav a { color: rgba(255,255,255,0.75); text-decoration:none; margin-left:18px; font-weight:600; }
+    nav a.active { color: white; }
+    .page { width: min(1200px, 1100px); margin-top: 110px; display: grid; grid-template-columns: 1fr 380px; gap: 32px; align-items:start; }
+    .card { background: var(--card); border-radius: 12px; padding: 22px; box-shadow: 0 10px 30px rgba(2,6,23,0.45); color: #0b1220; }
+    .file-input { display:flex; gap:12px; align-items:center; background:#f7f9fc; padding:14px; border-radius:10px; border:1px solid #eef2f6; }
+    .btn-primary { background: linear-gradient(90deg,var(--accent), #4f46e5); color:white; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
+    .radio-group { margin-top:14px; display:flex; gap:14px; align-items:center; }
+    .right { display:flex; flex-direction:column; gap:18px; }
+    .location-card { background:#0f1724; color:white; padding:14px; border-radius:12px; box-shadow: 0 10px 30px rgba(2,6,23,0.6); }
+    .map { width:100%; height:240px; border-radius:8px; overflow:hidden; margin-top:12px; border:1px solid rgba(255,255,255,0.06) }
+    .gallery { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    .gallery img { width:120px; height:auto; border-radius:8px; object-fit:cover; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,0.15); }
+    @media (max-width: 1000px){ .page{ grid-template-columns: 1fr; margin-top: 90px; } header{ left:14px; transform:none; width:calc(100% - 28px) } }
+    /* small geo helper */
+    .geo-helper { margin-top:12px; font-size:13px; color:var(--muted); display:flex; gap:8px; align-items:center; }
+    .geo-input { padding:6px; border-radius:6px; border:1px solid #e6eefc; width:110px; }
+
+    /* LOADING SPINNER (small & subtle) */
+    .server-spinner {
+      width:16px;
+      height:16px;
+      border-radius:50%;
+      border: 2px solid rgba(255,255,255,0.18);
+      border-top: 2px solid var(--accent);
+      animation: spin 1s linear infinite;
+      display: none; /* hidden by default */
+      margin-right: 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .server-status {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      color:var(--muted);
+      font-size:13px;
+      margin-top:8px;
+    }
+
+    /* ensure left alignment of the status (left side only) */
+    .server-status-wrap { text-align:left; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">PD</div>
+    <div>
+      <div style="font-weight:700;color:#fff">PDACEK</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.65)">Digital Vision — Lane & Pothole</div>
+    </div>
+  </div>
+
+  <nav>
+    <a href="/">Home</a>
+    <a href="/pothole" class="active" style="margin-left:18px">Pothole</a>
+  </nav>
+</header>
+
+<main class="page">
+  <section class="card">
+    <h2>Upload a road video</h2>
+    <div style="color:#6b7280; margin-bottom:12px">Select a video recorded on the road. Browser will request location permission. </div>
+
+    <div style="display:flex; gap:12px; align-items:center;">
+      <div class="file-input">
+        <label for="videoFile" style="cursor:pointer; display:flex; gap:12px; align-items:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h10l4 4v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="#0b1220" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div>
+            <div style="font-weight:700; color:#0b1220">Choose file</div>
+            <div style="font-size:12px; color:#6b7280">MP4, MOV, AVI — mobile phone videos work best</div>
+          </div>
+        </label>
+        <input id="videoFile" type="file" accept="video/*" onchange="previewVideo(event)" style="display:none;">
+      </div>
+
+      <button class="btn-primary" onclick="uploadVideo()">Upload</button>
+    </div>
+
+    <div class="radio-group" style="margin-top:16px;">
+      <label><input type="radio" name="process_type" value="lane" checked> Lane Detection</label>
+      <label><input type="radio" name="process_type" value="damage"> Damage Detection</label>
+    </div>
+
+    <!-- server-side status with left-side spinner (the requested placement) -->
+    <div class="server-status-wrap">
+      <div id="serverStatus" class="server-status" style="display:flex; align-items:center;">
+        <div id="serverSpinner" class="server-spinner" aria-hidden="true"></div>
+        <div id="serverMessage" style="color:var(--muted)">Server-side processing — may take a moment</div>
+      </div>
+    </div>
+
+    <!-- geolocation helper: status and manual coords input -->
+    <div class="geo-helper" id="geoHelper">
+      <div id="geoStatus">Location: <strong id="geoMessage">unknown</strong></div>
+      <button id="geoRetry" style="padding:6px 10px; border-radius:6px; background:#2563eb; color:white; border:none; cursor:pointer;">Retry</button>
+      <button id="geoManualToggle" style="padding:6px 10px; border-radius:6px; background:transparent; border:1px solid #e6eefc; cursor:pointer;">Manual</button>
+      <div id="geoManual" style="display:none; gap:8px; align-items:center;">
+        <input id="manualLat" class="geo-input" placeholder="lat">
+        <input id="manualLon" class="geo-input" placeholder="lon">
+        <button id="geoApply" style="padding:6px 10px; border-radius:6px; background:#10b981; color:white; border:none; cursor:pointer;">Apply</button>
+      </div>
+    </div>
+
+    <div id="videoContainer" style="margin-top:18px; display:none">
+      <h3 style="margin:0 0 8px 0">Uploaded video</h3>
+      <video id="uploadedVideo" controls preload="metadata" style="width:100%; border-radius:8px; background:#000"></video>
+    </div>
+
+    <div id="processedVideoContainer" style="margin-top:18px; display:none">
+      <h3 style="margin:0 0 8px 0">Processed video</h3>
+      <video id="processedVideo" controls preload="metadata" style="width:100%; border-radius:8px; background:#000"></video>
+    </div>
+
+    <!-- (moved gallery to appear under location in the right column) -->
+  </section>
+
+  <aside class="right">
+    <div class="card" style="padding:12px;">
+      <div class="video-title">Preview</div>
+      <div style="color:var(--muted); font-size:13px">Upload a video to see processed results and detected potholes.</div>
+    </div>
+
+    <div class="location-card" id="locationContainer" style="display:none">
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <div>
+          <div style="font-size:13px; color:rgba(255,255,255,0.85)">Detected Location</div>
+          <div class="location-text" id="locationText">Latitude: -- , Longitude: --</div>
+        </div>
+        <div style="font-size:12px; color:rgba(255,255,255,0.65)">Source: metadata / browser</div>
+      </div>
+      <div class="map" id="map"></div>
+    </div>
+
+    <!-- Gallery for top pothole crops (now below the location) -->
+    <div class="card" id="potholeGallery" style="display:none; margin-top:12px;">
+      <h3 style="margin:0 0 8px 0">Detected Potholes (Top 5)</h3>
+      <div id="potholeImages" class="gallery"></div>
+    </div>
+
+    <!-- Email sender card -->
+    <div class="card" id="emailCard" style="margin-top:12px;">
+      <h3 style="margin:0 0 8px 0">Send report via email</h3>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input id="emailTo" type="email" placeholder="recipient@example.com" style="flex:1; padding:10px; border:1px solid #e6eefc; border-radius:8px;" />
+        <button class="btn-primary" onclick="sendEmail()">Send</button>
+      </div>
+      <div style="font-size:12px; color:#6b7280; margin-top:6px;">Sends the location and top 5 snapshots as attachments.</div>
+      <div id="emailStatus" style="font-size:13px; color:#6b7280; margin-top:8px;"></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+  // small state for manual/browser coordinates
+  let browserCoords = null;
+  let lastResult = null; // server response from /upload
+  let lastLocation = null; // latest {latitude, longitude}
+
+  // show/hide server-side loading UI (spinner on left of the caption)
+  function setLoading(on, message) {
+    const spinner = document.getElementById("serverSpinner");
+    const msgEl = document.getElementById("serverMessage");
+    const wrapper = document.getElementById("serverStatus");
+    if (!spinner || !msgEl || !wrapper) return;
+    if (on) {
+      spinner.style.display = "inline-block";
+      wrapper.style.display = "flex";
+      if (message) msgEl.textContent = message;
+      else msgEl.textContent = "Server-side processing — may take a moment";
+    } else {
+      spinner.style.display = "none";
+      // keep message visible but muted; hide spinner only
+      msgEl.textContent = "Server-side processing — may take a moment";
+      // optionally hide entire wrapper when not loading:
+      wrapper.style.display = "flex"; // keep caption visible per your screenshot
+    }
+  }
+
+  // show preview of selected video (keeps existing IDs)
+  function previewVideo(event) {
+    const file = event.target.files[0];
+    const videoContainer = document.getElementById("videoContainer");
+    const videoElement = document.getElementById("uploadedVideo");
+    if (file) {
+      const fileURL = URL.createObjectURL(file);
+      videoElement.src = fileURL;
+      videoContainer.style.display = "block";
+      videoElement.onloadeddata = () => URL.revokeObjectURL(fileURL);
+    }
+  }
+
+  // geolocation helper utilities
+  async function getCoordsWithTimeout(timeoutMs = 7000) {
+    if (!navigator.geolocation) {
+      console.log("Geolocation not available");
+      return null;
+    }
+    return new Promise((resolve) => {
+      let done = false;
+      const timer = setTimeout(() => {
+        if (!done) { done = true; console.warn("Geolocation timed out"); resolve(null); }
+      }, timeoutMs);
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (done) return;
+          done = true; clearTimeout(timer);
+          const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          console.log("Geolocation success:", coords);
+          resolve(coords);
+        },
+        (err) => {
+          if (done) return;
+          done = true; clearTimeout(timer);
+          console.warn("Geolocation error:", err);
+          resolve(null);
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: timeoutMs }
+      );
+    });
+  }
+
+  // update UI geo status
+  function setGeoMessage(msg) {
+    document.getElementById("geoMessage").textContent = msg;
+  }
+
+  // try to populate browserCoords at load (non-blocking)
+  (async function tryInitialGeo() {
+    setGeoMessage("checking…");
+    const c = await getCoordsWithTimeout(3000);
+    if (c) {
+      browserCoords = c;
+      setGeoMessage(`${c.latitude.toFixed(6)}, ${c.longitude.toFixed(6)}`);
+      document.getElementById("manualLat").value = c.latitude.toFixed(6);
+      document.getElementById("manualLon").value = c.longitude.toFixed(6);
+    } else {
+      setGeoMessage("unknown (tap Retry or enter manually)");
+    }
+  })();
+
+  // geo helper UI actions
+  document.getElementById("geoRetry").addEventListener("click", async () => {
+    setGeoMessage("requesting…");
+    const c = await getCoordsWithTimeout(7000);
+    if (c) {
+      browserCoords = c;
+      setGeoMessage(`${c.latitude.toFixed(6)}, ${c.longitude.toFixed(6)}`);
+      document.getElementById("manualLat").value = c.latitude.toFixed(6);
+      document.getElementById("manualLon").value = c.longitude.toFixed(6);
+    } else {
+      browserCoords = null;
+      setGeoMessage("not available");
+    }
+  });
+
+  document.getElementById("geoManualToggle").addEventListener("click", () => {
+    const m = document.getElementById("geoManual");
+    m.style.display = m.style.display === "flex" ? "none" : "flex";
+  });
+
+  document.getElementById("geoApply").addEventListener("click", () => {
+    const lat = parseFloat(document.getElementById("manualLat").value);
+    const lon = parseFloat(document.getElementById("manualLon").value);
+    if (!isFinite(lat) || !isFinite(lon)) {
+      alert("Enter valid numeric coordinates.");
+      return;
+    }
+    browserCoords = { latitude: lat, longitude: lon };
+    setGeoMessage(`manual ${lat.toFixed(6)}, ${lon.toFixed(6)}`);
+    document.getElementById("geoManual").style.display = "none";
+  });
+
+  // main upload: waits for coords then uploads. Keeps same element IDs.
+  async function uploadVideo() {
+    const fileInput = document.getElementById("videoFile");
+    if (!fileInput.files.length) {
+      alert("Please select a file!");
+      return;
+    }
+
+    const processType = document.querySelector('input[name="process_type"]:checked').value;
+    const processedVideoElement = document.getElementById("processedVideo");
+    const processedVideoContainer = document.getElementById("processedVideoContainer");
+    const locationContainer = document.getElementById("locationContainer");
+    const imagesDiv = document.getElementById("potholeImages");
+    const gallery = document.getElementById("potholeGallery");
+
+    // reset UI
+    processedVideoContainer.style.display = "none";
+    locationContainer.style.display = "none";
+    gallery.style.display = "none";
+    imagesDiv.innerHTML = "";
+
+    // Build form data
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+    formData.append("process_type", processType);
+
+    // SHOW LOADING (phase: getting location) — spinner will appear left of caption
+    setLoading(true, "Server-side processing — may take a moment");
+
+    // Wait briefly for browserCoords if already present, otherwise request up to 7s
+    let coords = browserCoords;
+    if (!coords) {
+      // show status
+      setGeoMessage("requesting...");
+      coords = await getCoordsWithTimeout(7000);
+    }
+
+    if (coords) {
+      // add to form data
+      formData.append("latitude", coords.latitude);
+      formData.append("longitude", coords.longitude);
+      // show in UI
+      document.getElementById("locationText").textContent =
+        `Latitude: ${coords.latitude.toFixed(6)}, Longitude: ${coords.longitude.toFixed(6)}`;
+      locationContainer.style.display = "block";
+      // keep browserCoords in sync
+      browserCoords = coords;
+    } else {
+      // no coords — set message but still continue upload
+      setGeoMessage("not available — uploading without coords");
+    }
+
+    // SHOW UPLOADING & SERVER PROCESSING PHASE (spinner still left of caption)
+    
+
+    // Send upload
+    try {
+      const res = await fetch("/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      console.log("Server response:", data);
+
+      lastResult = data;
+
+      if (data.video_url) {
+        processedVideoElement.src = data.video_url;
+        processedVideoContainer.style.display = "block";
+      }
+
+      // server-side reported location (metadata or echoed coords)
+      if (data.location) {
+        const loc = data.location;
+        lastLocation = loc;
+        document.getElementById("locationText").textContent =
+          `Latitude: ${loc.latitude}, Longitude: ${loc.longitude}`;
+        locationContainer.style.display = "block";
+        if (typeof loadMap === "function") loadMap(loc.latitude, loc.longitude);
+      }
+
+      // show pothole thumbnails if any
+      imagesDiv.innerHTML = "";
+      if (data.pothole_images && data.pothole_images.length > 0) {
+        data.pothole_images.forEach((imgUrl) => {
+          const img = document.createElement("img");
+          img.src = imgUrl;
+          img.alt = "pothole";
+          img.onclick = () => window.open(imgUrl, "_blank");
+          imagesDiv.appendChild(img);
+        });
+        gallery.style.display = "block";
+      } else {
+        gallery.style.display = "none";
+      }
+
+      // show debug echo if present (temporary)
+      if (data._debug_received) {
+        console.log("_debug_received:", data._debug_received);
+      }
+
+      // HIDE spinner (but keep caption visible)
+      setLoading(false);
+
+    } catch (err) {
+      console.error("Upload error:", err);
+      // HIDE spinner on error
+      setLoading(false);
+      alert("An error occurred while uploading or processing the video.");
+    }
+  }
+
+  // map helper (OpenStreetMap embed)
+  function loadMap(lat, lon) {
+    const mapDiv = document.getElementById("map");
+    mapDiv.innerHTML = "";
+    const iframe = document.createElement('iframe');
+    iframe.width = "100%";
+    iframe.height = "100%";
+    iframe.style.border = "0";
+    const bboxLonMin = (lon - 0.02).toFixed(6);
+    const bboxLatMin = (lat - 0.01).toFixed(6);
+    const bboxLonMax = (lon + 0.02).toFixed(6);
+    const bboxLatMax = (lat + 0.01).toFixed(6);
+    iframe.src = `https://www.openstreetmap.org/export/embed.html?bbox=${bboxLonMin}%2C${bboxLatMin}%2C${bboxLonMax}%2C${bboxLatMax}&layer=mapnik&marker=${lat}%2C${lon}`;
+    mapDiv.appendChild(iframe);
+  }
+
+  // send email with current results
+  async function sendEmail() {
+    const statusEl = document.getElementById('emailStatus');
+    const to = document.getElementById('emailTo').value.trim();
+    statusEl.textContent = '';
+    if (!to) { alert('Enter recipient email'); return; }
+    if (!lastResult) { alert('Process a video first.'); return; }
+
+    const images = Array.isArray(lastResult.pothole_images) ? lastResult.pothole_images : [];
+    const payload = {
+      to,
+      images,
+      location: lastLocation || lastResult.location || null
+    };
+    try {
+      statusEl.textContent = 'Sending…';
+      const res = await fetch('/send_email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        statusEl.textContent = `Email sent to ${data.to}`;
+      } else {
+        statusEl.textContent = `Error: ${data.error || 'failed'}`;
+      }
+    } catch (e) {
+      statusEl.textContent = 'Network error sending email';
+    }
+  }
+</script>
+</body>
+</html>

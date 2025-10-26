@@ -1,0 +1,30 @@
+<!-- templates/index1.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Digital Vision — Home</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body{ margin:0; font-family:"Inter",system-ui,-apple-system; background: linear-gradient(180deg,#071023,#0f1724); color:white; display:flex; align-items:center; justify-content:center; height:100vh;}
+    .box{ background: rgba(255,255,255,0.04); padding:28px; border-radius:14px; width: min(760px, calc(100% - 40px)); box-shadow: 0 12px 40px rgba(2,6,23,0.6); text-align:center;}
+    .logo{ width:56px; height:56px; border-radius:12px; background:linear-gradient(135deg,#2563eb,#ff4c4c); display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; color:white; margin-bottom:12px;}
+    h1{ margin:8px 0 6px 0; font-size:22px; }
+    p{ color:rgba(255,255,255,0.75); margin:0 0 18px 0; }
+    a.btn{ display:inline-block; padding:12px 18px; background:linear-gradient(90deg,#2563eb,#7c3aed); color:white; border-radius:10px; text-decoration:none; font-weight:700; box-shadow:0 8px 30px rgba(37,99,235,0.18); }
+    a.small{ display:inline-block; margin-left:12px; color:rgba(255,255,255,0.85); text-decoration:none; font-weight:600;}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">PD</div>
+    <h1>Digital Vision System for Road Damage & Lane Detection</h1>
+    <p>Upload road videos to detect lanes and identify potholes. The website will attempt to attach location data from your device (permission required) or from embedded video metadata.</p>
+    <div style="margin-top:16px">
+      <a class="btn" href="/pothole">Open Upload Page</a>
+      <a class="small" href="#" onclick="alert('Project: PDACEK')">About</a>
+    </div>
+  </div>
+</body>
+</html>
